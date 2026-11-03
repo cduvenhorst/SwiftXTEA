@@ -22,12 +22,19 @@ public struct XTEA: Sendable {
         }
 
         let bytes = Array(key)
-        self.key = stride(from: 0, to: 16, by: 4).map { offset in
-            (UInt32(bytes[offset]) << 24)
-                | (UInt32(bytes[offset + 1]) << 16)
-                | (UInt32(bytes[offset + 2]) << 8)
-                | UInt32(bytes[offset + 3])
+        var words: [UInt32] = []
+        words.reserveCapacity(4)
+
+        for offset in stride(from: 0, to: 16, by: 4) {
+            let byte0 = UInt32(bytes[offset])
+            let byte1 = UInt32(bytes[offset + 1])
+            let byte2 = UInt32(bytes[offset + 2])
+            let byte3 = UInt32(bytes[offset + 3])
+            let word = (byte0 << 24) | (byte1 << 16) | (byte2 << 8) | byte3
+            words.append(word)
         }
+
+        self.key = words
     }
 
     /// Encrypts one 8-byte block. The result uses big-endian byte order.
@@ -52,16 +59,20 @@ public struct XTEA: Sendable {
         if decrypt {
             var sum = Self.delta &* 32
             for _ in 0..<32 {
-                v1 = v1 &- ((((v0 << 4) ^ (v0 >> 5)) &+ v0) ^ (sum &+ key[Int((sum >> 11) & 3)]))
+                let mix1 = ((v0 << 4) ^ (v0 >> 5)) &+ v0
+                v1 = v1 &- (mix1 ^ (sum &+ key[Int((sum >> 11) & 3)]))
                 sum = sum &- Self.delta
-                v0 = v0 &- ((((v1 << 4) ^ (v1 >> 5)) &+ v1) ^ (sum &+ key[Int(sum & 3)]))
+                let mix0 = ((v1 << 4) ^ (v1 >> 5)) &+ v1
+                v0 = v0 &- (mix0 ^ (sum &+ key[Int(sum & 3)]))
             }
         } else {
             var sum: UInt32 = 0
             for _ in 0..<32 {
-                v0 = v0 &+ ((((v1 << 4) ^ (v1 >> 5)) &+ v1) ^ (sum &+ key[Int(sum & 3)]))
+                let mix0 = ((v1 << 4) ^ (v1 >> 5)) &+ v1
+                v0 = v0 &+ (mix0 ^ (sum &+ key[Int(sum & 3)]))
                 sum = sum &+ Self.delta
-                v1 = v1 &+ ((((v0 << 4) ^ (v0 >> 5)) &+ v0) ^ (sum &+ key[Int((sum >> 11) & 3)]))
+                let mix1 = ((v0 << 4) ^ (v0 >> 5)) &+ v0
+                v1 = v1 &+ (mix1 ^ (sum &+ key[Int((sum >> 11) & 3)]))
             }
         }
 
@@ -78,9 +89,10 @@ public struct XTEA: Sendable {
     }
 
     private func readWord(_ bytes: [UInt8], at offset: Int) -> UInt32 {
-        (UInt32(bytes[offset]) << 24)
-            | (UInt32(bytes[offset + 1]) << 16)
-            | (UInt32(bytes[offset + 2]) << 8)
-            | UInt32(bytes[offset + 3])
+        let byte0 = UInt32(bytes[offset])
+        let byte1 = UInt32(bytes[offset + 1])
+        let byte2 = UInt32(bytes[offset + 2])
+        let byte3 = UInt32(bytes[offset + 3])
+        return (byte0 << 24) | (byte1 << 16) | (byte2 << 8) | byte3
     }
 }
