@@ -9,10 +9,69 @@ public struct XTEA: Sendable {
     public enum Error: Swift.Error, Equatable {
         case invalidKeyLength
         case invalidBlockLength
+        case invalidKeyWordCount
+        case invalidRoundCount
     }
 
     private static let delta: UInt32 = 0x9E3779B9
     private let key: [UInt32]
+
+    /// Encrypts two 32-bit words with four 32-bit key words.
+    /// This is the word-oriented equivalent of encrypt(block:).
+    /// - Throws: `Error.invalidKeyWordCount` unless the key has four words,
+    ///   or `Error.invalidRoundCount` when rounds is negative.
+    public static func encrypt(
+        v0: UInt32,
+        v1: UInt32,
+        key: [UInt32],
+        rounds: Int = 32
+    ) throws -> (v0: UInt32, v1: UInt32) {
+        try transform(v0: v0, v1: v1, key: key, rounds: rounds, decrypt: false)
+    }
+
+    /// Decrypts two 32-bit words with four 32-bit key words.
+    public static func decrypt(
+        v0: UInt32,
+        v1: UInt32,
+        key: [UInt32],
+        rounds: Int = 32
+    ) throws -> (v0: UInt32, v1: UInt32) {
+        try transform(v0: v0, v1: v1, key: key, rounds: rounds, decrypt: true)
+    }
+
+    private static func transform(
+        v0 initialV0: UInt32,
+        v1 initialV1: UInt32,
+        key: [UInt32],
+        rounds: Int,
+        decrypt: Bool
+    ) throws -> (v0: UInt32, v1: UInt32) {
+        guard key.count == 4 else { throw Error.invalidKeyWordCount }
+        guard rounds >= 0 else { throw Error.invalidRoundCount }
+
+        var v0 = initialV0
+        var v1 = initialV1
+        if decrypt {
+            var sum = delta &* UInt32(truncatingIfNeeded: rounds)
+            for _ in 0..<rounds {
+                let mix1 = ((v0 << 4) ^ (v0 >> 5)) &+ v0
+                v1 = v1 &- (mix1 ^ (sum &+ key[Int((sum >> 11) & 3)]))
+                sum = sum &- delta
+                let mix0 = ((v1 << 4) ^ (v1 >> 5)) &+ v1
+                v0 = v0 &- (mix0 ^ (sum &+ key[Int(sum & 3)]))
+            }
+        } else {
+            var sum: UInt32 = 0
+            for _ in 0..<rounds {
+                let mix0 = ((v1 << 4) ^ (v1 >> 5)) &+ v1
+                v0 = v0 &+ (mix0 ^ (sum &+ key[Int(sum & 3)]))
+                sum = sum &+ delta
+                let mix1 = ((v0 << 4) ^ (v0 >> 5)) &+ v0
+                v1 = v1 &+ (mix1 ^ (sum &+ key[Int((sum >> 11) & 3)]))
+            }
+        }
+        return (v0, v1)
+    }
 
     /// Creates an XTEA instance using a 16-byte key.
     /// Key words are interpreted in big-endian byte order.
