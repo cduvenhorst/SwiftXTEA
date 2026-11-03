@@ -24,6 +24,20 @@ final class XTEATests: XCTestCase {
         XCTAssertEqual(encrypted.hex, "497df3d072612cb5")
     }
 
+    func testEncryptsAllOnesVector() throws {
+        let cipher = try XTEA(key: Data(repeating: 0xff, count: 16))
+        let encrypted = try cipher.encrypt(block: Data(repeating: 0xff, count: 8))
+
+        XCTAssertEqual(encrypted.hex, "28fc2891e623566a")
+    }
+
+    func testDecryptsAllOnesVector() throws {
+        let cipher = try XTEA(key: Data(repeating: 0xff, count: 16))
+        let plaintext = try cipher.decrypt(block: Data(hex: "28fc2891e623566a"))
+
+        XCTAssertEqual(plaintext, Data(repeating: 0xff, count: 8))
+    }
+
     func testRoundTrip() throws {
         let key = Data(hex: "00112233445566778899aabbccddeeff")
         let block = Data("12345678".utf8)
