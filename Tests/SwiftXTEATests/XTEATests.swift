@@ -48,6 +48,9 @@ final class XTEATests: XCTestCase {
         let expectedV1 = bytes.suffix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
         XCTAssertEqual(result.v0, expectedV0)
         XCTAssertEqual(result.v1, expectedV1)
+        // Independent expected result from the original Python XTEA snippet.
+        XCTAssertEqual(result.v0, 0x497df3d0)
+        XCTAssertEqual(result.v1, 0x72612cb5)
     }
 
     func testWordAPIEncryptDecryptRoundTrip() throws {
